@@ -53,12 +53,17 @@ object StatisticsApp extends App {
   ratings.createOrReplaceTempView("ratings")
   // ====统计====
   // 1、电影被评分最多次的电影
-  StatisticsAlgo.rateMost(spark)
-  ratings.unpersist()
-  movies.unpersist()
-  spark.close()
-  // 2、近期热门电影
-  StatisticsAlgo.rateMostRecentMovies(spark)
+//  StatisticsAlgo.rateMost(spark)
+//  ratings.unpersist()
+//  movies.unpersist()
+//  spark.close()
+//  // 2、近期热门电影
+//  StatisticsAlgo.rateMostRecentMovies(spark)
+//  ratings.unpersist()
+//  movies.unpersist()
+//  spark.close()
+  //  3+4、按类别统计平均分最高的10个电影
+  StatisticsAlgo.genreTop10(spark, movies)
   ratings.unpersist()
   movies.unpersist()
   spark.close()

@@ -51,7 +51,11 @@ case class MongoConfig(val uri : String, val db : String)
  */
 case class ESConfig(val httpHosts : String, val transportHosts : String, val index : String, val clusterName : String)
 
-
+/**
+ * 表结构
+ */
+case class Recommendation(mid: Int, avg: Double)
+case class GenresRec(genres: String, reco: Seq[Recommendation])
 
 
 

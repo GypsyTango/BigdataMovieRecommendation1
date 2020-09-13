@@ -41,8 +41,58 @@ object StatisticsAlgo {
       .save()
   }
 
-  // 3、按类别统计平均分最高的10个电影
+  // 3+4、按类别统计平均分最高的10个电影
   def genreTop10(spark: SparkSession, movies: Dataset[Movie])(implicit mongoConfig: MongoConfig): Unit = {
+    // 定义出所有的电影类别
+    val genres = List("Action","Adventure","Animation","Comedy","Crime","Documentary",
+      "Drama","Family","Fantasy","Foreign","History","Horror","Music","Mystery","Romance",
+      "Science","Tv","Thriller","War","Western")
+    // 统计电影所有电影平均分
+    val avgMovieScoreDF = spark.sql("select mid, avg(score) as avg from ratings group by mid").cache
+    // 统计各电影类别中评分最高的前十部电影
+    // movies表 和 avgMovieScoreDF表 进行join
+    val moviesWithScoreDF = movies.join(avgMovieScoreDF,Seq("mid", "mid")).select("mid","avg","genres").cache
+    // 将 genres list 转成 RDD
+    val genresRDD = spark.sparkContext.makeRDD(genres)
+    // 笛卡尔积操作,并进行筛选。
+    // 如果genresRDD表里面的genres字段和moviesWithScoreDF表中的genres字段吻合，将本电影保存下来，其他的则予以删除
+    import spark.implicits._
+    val genresTopMovies = genresRDD.cartesian(moviesWithScoreDF.rdd).filter{
+      case (genres, row) => {
+        row.getAs[String]("genres").toLowerCase().contains(genres.toLowerCase())
+      }
+    }.map {
+      // 更改格式为: RDD[(String, (Int, Double))]
+      case (genres, row) => {
+        (genres, ((row.getAs[Int]("mid")), row.getAs[Double]("avg")))
+      }
+    // 归类
+    }.groupByKey()
+      // 排序
+      .map{
+        case (genres, items) => {
+          GenresRec(
+            genres,
+            items.toList.sortWith(_._2 > _._2).take(n = 10).map(x => Recommendation(x._1,x._2))
+          )
+        }
+      }.toDF()
+
+    // 写入AverageMoviesScore到mongoDB中
+    avgMovieScoreDF.write
+      .option("uri", mongoConfig.uri)
+      .option("collection", AVERAGE_MOVIES_SCORE)
+      .mode("overwrite")
+      .format("com.mongodb.spark.sql")
+      .save()
+
+    // 写入GenresTopMovies到mongoDB中
+    genresTopMovies.write
+      .option("uri", mongoConfig.uri)
+      .option("collection", GENRES_TOP_MOVIES)
+      .mode("overwrite")
+      .format("com.mongodb.spark.sql")
+      .save()
 
   }
 }
